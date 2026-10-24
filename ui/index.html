@@ -13,7 +13,7 @@
   --bg:#000; --page:#02030a; --panel:#04060f;
   --ink:#cdd5ee; --hi:#ffffff; --dim:#7b84a6; --rule:#150C40;
   --b:#4d6cff; --bbg:#150C40; --line:#2b1d78;
-  --g:#5fdc8a; --y:#e9c84c; --r:#ff5f5f;
+  --g:#5fdc8a; --y:#e9c84c; --r:#ff5f5f; --o:#ff9a3c;
   --f:"WGD","BigBlue","Consolas","Courier New",ui-monospace,monospace;
   --fr:"WGR","WGD","BigBlue",ui-monospace,monospace;
   color-scheme:dark;
@@ -148,17 +148,17 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .task .at{color:var(--dim)} .task.nx .at,.task.nx .tx{color:var(--hi)}
 .task .tx{white-space:normal;word-break:break-word}
 .mk{font-style:normal;margin-right:.45em;font-size:.75em;vertical-align:.1em}
-.mk.c-b{color:var(--b)} .mk.c-w{color:var(--hi)} .mk.c-p{color:#b47cf0} .mk.c-g{color:var(--g)} .mk.c-y{color:var(--y)} .mk.c-d{color:var(--dim)}
+.mk.c-b{color:var(--b)} .mk.c-w{color:var(--hi)} .mk.c-p{color:#b47cf0} .mk.c-g{color:var(--g)} .mk.c-y{color:var(--y)} .mk.c-o{color:var(--o)} .mk.c-r{color:#ff5f5f} .mk.c-d{color:var(--dim)}
 .task.done .mk{opacity:.45}
 .task.done .tx{color:var(--dim)!important}
 .lg{display:flex;gap:0 1.1em;flex-wrap:wrap;color:var(--dim);font-size:.85em;padding:0 .2em}
 .lg i{font-style:normal;margin-right:.35em;font-size:.8em}
-.lg .c-b{color:var(--b)} .lg .c-w{color:var(--hi)} .lg .c-p{color:#b47cf0} .lg .c-g{color:var(--g)} .lg .c-y{color:var(--y)} .lg .c-d{color:var(--dim)}
+.lg .c-b{color:var(--b)} .lg .c-w{color:var(--hi)} .lg .c-p{color:#b47cf0} .lg .c-g{color:var(--g)} .lg .c-y{color:var(--y)} .lg .c-o{color:var(--o)} .lg .c-r{color:#ff5f5f} .lg .c-d{color:var(--dim)}
 .dbrow{display:flex;justify-content:space-between;gap:1em;padding:.15em 0}
 .js-hold{touch-action:none}
-.dbrow .dbc.c-b{color:var(--b)} .dbrow .dbc.c-w{color:var(--hi)} .dbrow .dbc.c-p{color:#b47cf0} .dbrow .dbc.c-g{color:var(--g)} .dbrow .dbc.c-y{color:var(--y)} .dbrow .dbc.c-d{color:var(--dim)}
+.dbrow .dbc.c-b{color:var(--b)} .dbrow .dbc.c-w{color:var(--hi)} .dbrow .dbc.c-p{color:#b47cf0} .dbrow .dbc.c-g{color:var(--g)} .dbrow .dbc.c-y{color:var(--y)} .dbrow .dbc.c-o{color:var(--o)} .dbrow .dbc.c-r{color:#ff5f5f} .dbrow .dbc.c-d{color:var(--dim)}
 .dbrow .off{color:var(--dim)}
-.dbrow .dbc.kf.c-b{color:var(--b)!important} .dbrow .dbc.kf.c-w{color:var(--hi)!important} .dbrow .dbc.kf.c-p{color:#b47cf0!important} .dbrow .dbc.kf.c-g{color:var(--g)!important} .dbrow .dbc.kf.c-y{color:var(--y)!important} .dbrow .dbc.kf.c-d{color:var(--dim)!important}
+.dbrow .dbc.kf.c-b{color:var(--b)!important} .dbrow .dbc.kf.c-w{color:var(--hi)!important} .dbrow .dbc.kf.c-p{color:#b47cf0!important} .dbrow .dbc.kf.c-g{color:var(--g)!important} .dbrow .dbc.kf.c-y{color:var(--y)!important} .dbrow .dbc.kf.c-o{color:var(--o)!important} .dbrow .dbc.kf.c-r{color:#ff5f5f!important} .dbrow .dbc.kf.c-d{color:var(--dim)!important}
 .tchoice{display:flex;gap:1em;flex-wrap:wrap;padding-left:4ch}
 
 /* launch lines */
@@ -406,6 +406,8 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .app.c-p{border-color:#4b2a73} .app.c-p b{color:#b47cf0}
 .app.c-g{border-color:#1f5a38} .app.c-g b{color:var(--g)}
 .app.c-y{border-color:#5a4c1f} .app.c-y b{color:var(--y)}
+.app.c-o{border-color:#5a3517} .app.c-o b{color:var(--o)}
+.app.c-r{border-color:#5a1f1f} .app.c-r b{color:#ff5f5f}
 .app.c-d{border-color:var(--rule)} .app.c-d b{color:var(--dim)}
 .app.ed{border-style:dashed;touch-action:pan-y}
 .app .grip{position:absolute;right:0;top:0;bottom:0;width:2.2em;display:grid;place-items:center;color:var(--dim);font-style:normal;touch-action:none;border-left:1px dashed var(--rule)}
@@ -552,7 +554,7 @@ html.devm .screen{border-radius:0}
     ['termux','com.termux','p'],['ubu','@ubu','p'],['magisk','com.topjohnwu.magisk','p'],['f-droid','org.fdroid.fdroid','p'],['termux boot','com.termux.boot','p']];
   const MOCKAPPS=[['ubuntu','@ubu','b'],['tailscale','t','b'],['termux','x','b'],['moonlight','m','b'],['notion','n','w'],['notion cal','c','w'],['magisk','g','p'],['termux:boot','o','p']];
   let AE=false, appsT=0, appsRaw=[];
-  const COLS=['b','w','p','g','y','d'];
+  const COLS=['b','w','p','g','y','o','r','d'];
   function appList(){
     if(DEV&&Date.now()-appsT>4000){ try{ appsRaw=JSON.parse(Deck.apps()); }catch(e){ appsRaw=[]; } appsT=Date.now(); }
     const inst=new Map(appsRaw.map(a=>[a[1],a[0]]));
