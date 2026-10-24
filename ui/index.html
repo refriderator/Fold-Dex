@@ -1008,11 +1008,12 @@ html.devm .screen{border-radius:0}
   function render(){
     clearTimers();
     const p=S.orient==='portrait'?'p':'l';
-    const vk=S.mode+':'+view(), keep=vk===lastView?[...ui.querySelectorAll(SCR)].map(e=>e.scrollTop):null; lastView=vk;
+    const vk=S.mode+':'+view(), entered=vk!==lastView, keep=vk===lastView?[...ui.querySelectorAll(SCR)].map(e=>e.scrollTop):null; lastView=vk;
     S.mode==='cover'?renderCover(p):renderInner(p);
     if(keep) ui.querySelectorAll(SCR).forEach((e,i)=>{ if(keep[i]) e.scrollTop=keep[i]; });
     ui.classList.toggle('dense',S.set.dense); dev.classList.toggle('noscan',!S.set.scan);
     tick(); fitClk(); readout(); wire(); drawMon(); restoreCur(); syncAdj();
+    if(entered&&view()==='apps'&&!AE){ const a0=ui.querySelector('.agrid .app'); if(a0) setCur(a0); }
     if(DEV){ ui.querySelectorAll('input:not(.js-cfg),textarea').forEach(e=>e.setAttribute('inputmode','none')); store.set('notes',S.notes); store.set('set',S.set); }
     ui.querySelectorAll('.js-tlog,.js-ccaps').forEach(t=>t.scrollTop=t.scrollHeight);
     if(view()==='audio') startAudio();
