@@ -156,6 +156,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .lg .c-b{color:var(--b)} .lg .c-w{color:var(--hi)} .lg .c-p{color:#b47cf0} .lg .c-g{color:var(--g)} .lg .c-y{color:var(--y)} .lg .c-o{color:var(--o)} .lg .c-r{color:#ff5f5f} .lg .c-d{color:var(--dim)}
 .dbrow{display:flex;justify-content:space-between;gap:1em;padding:.15em 0}
 .js-hold{touch-action:none}
+.kb button[data-k="|"]{font-family:ui-monospace,"Droid Sans Mono",monospace}
 .dbrow .dbc.c-b{color:var(--b)} .dbrow .dbc.c-w{color:var(--hi)} .dbrow .dbc.c-p{color:#b47cf0} .dbrow .dbc.c-g{color:var(--g)} .dbrow .dbc.c-y{color:var(--y)} .dbrow .dbc.c-o{color:var(--o)} .dbrow .dbc.c-r{color:#ff5f5f} .dbrow .dbc.c-d{color:var(--dim)}
 .dbrow .off{color:var(--dim)}
 .dbrow .dbc.kf.c-b{color:var(--b)!important} .dbrow .dbc.kf.c-w{color:var(--hi)!important} .dbrow .dbc.kf.c-p{color:#b47cf0!important} .dbrow .dbc.kf.c-g{color:var(--g)!important} .dbrow .dbc.kf.c-y{color:var(--y)!important} .dbrow .dbc.kf.c-o{color:var(--o)!important} .dbrow .dbc.kf.c-r{color:#ff5f5f!important} .dbrow .dbc.kf.c-d{color:var(--dim)!important}
@@ -497,7 +498,7 @@ html.devm .screen{border-radius:0}
   const CFG=Object.assign({akey:'',model:'claude-sonnet-5-5',ntoken:'',ntasks:'',nnotes:'',pc:'desktop-k5qkpsj',lat:'43.65',lon:'-79.38',city:'toronto',mtopic:'',mseen:0},store.get('cfg',{}));
   if(!Array.isArray(CFG.ndbs)) CFG.ndbs=[];
   if(CFG.ntasks&&!CFG.ndbs.length) CFG.ndbs=[{id:CFG.ntasks.replace(/-/g,''),name:'tasks',c:'b',on:true}];
-  if(!CFG.dex) CFG.dex='code';
+  CFG.dex='code'; /* dex always uses claude code now */
   const nid=x=>(String(x||'').replace(/-/g,'').match(/[0-9a-f]{32}/i)||[''])[0];
   if(!CFG.nnotes) CFG.nnotes='402ade4e1a04800697c6d246ae6b6cb7';
   const D={bat:0,chg:false,vpn:false,wifi:false,cell:false,online:false,ssid:'',sshd:null,chroot:null,wx:null,notion:'',apps:null,speech:false,minco:null,pc:null,peers:[]};
@@ -996,7 +997,7 @@ html.devm .screen{border-radius:0}
         '<div class="cfg"><span>notion databases<small>tap name = show/hide . tap colour = change</small></span>'+
           (CFG.ndbs.length?CFG.ndbs.map((d,i)=>'<div class="dbrow"><button type="button" class="'+(d.on?'':'off')+'" data-act="ndb:'+i+'">'+(d.on?'[x] ':'[ ] ')+esc(d.name)+'</button><button type="button" class="dbc c-'+d.c+'" data-act="ndbc:'+i+'">■ colour</button></div>').join(''):'<div class="cd">none yet</div>')+
           '<div class="acts"><button type="button" class="lk" data-act="nfind">[find my databases]</button></div></div>'+
-        '<div class="cfg"><span>dex<small>who answers</small></span><div class="acts"><button type="button" class="lk" data-act="dexeng">'+(CFG.dex==='api'?'[api key]':'[claude code . your subscription]')+'</button><button type="button" class="lk" data-act="ccinstall">[install claude code]</button><button type="button" class="lk" data-act="dexnew">[new dex chat]</button></div>'+
+        '<div class="cfg"><span>dex<small>who answers</small></span><div class="acts"><span class="cg">claude code . your subscription</span><button type="button" class="lk" data-act="ccinstall">[install claude code]</button><button type="button" class="lk" data-act="dexnew">[new dex chat]</button></div>'+
           '<div class="cd">claude code: install once, then open termux, type ubuntu, run claude and sign in once.</div></div>'+f('nnotes','notion notes database id','optional, deck notes get copied here')+f('pc','pc name','tailscale name of the pc')+f('peers','tailscale peers','comma list: name or name=100.x.x.x')+f('city','weather city','label only')+f('lat','latitude','weather')+f('lon','longitude','weather')+
         [['scan','scanlines','CRT lines on both screens'],['dense','dense front screen','smaller text on the cover'],['wheel','click wheel on closed screen','swap the closed-screen d-pad for a scroll wheel'],['wheelI','click wheel on open screen','swap the open-screen d-pad for a scroll wheel']]
           .map(s=>'<button type="button" class="set'+(S.set[s[0]]?' on':'')+'" data-act="set:'+s[0]+'"><span class="tg">'+(S.set[s[0]]?'[on ]':'[off]')+'</span><span>'+s[1]+'<small>'+s[2]+'</small></span></button>').join('')+
