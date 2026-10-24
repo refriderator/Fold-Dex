@@ -498,7 +498,7 @@ html.devm .screen{border-radius:0}
   if(!CFG.dex) CFG.dex='code';
   const nid=x=>(String(x||'').replace(/-/g,'').match(/[0-9a-f]{32}/i)||[''])[0];
   if(!CFG.nnotes) CFG.nnotes='402ade4e1a04800697c6d246ae6b6cb7';
-  const D={bat:0,chg:false,vpn:false,wifi:false,cell:false,online:false,ssid:'',sshd:null,chroot:null,wx:null,notion:'',apps:null,speech:false,minco:null};
+  const D={bat:0,chg:false,vpn:false,wifi:false,cell:false,online:false,ssid:'',sshd:null,chroot:null,wx:null,notion:'',apps:null,speech:false,minco:null,pc:null,peers:[]};
   const S={
     mode:'cover', orient:'portrait', cstack:['home'], istack:['hud'], intent:null,
     dd:false, vol:7, brt:6, wifi:'HOME-5G', nets:[['HOME-5G','5 GHz'],['iPhone hotspot','tethered'],['UofT','eduroam']],
@@ -622,8 +622,16 @@ html.devm .screen{border-radius:0}
     if(DEV&&!CFG.mtopic) return '<div class="cd">no topic yet. set minco ntfy topic in config.</div>';
     return '<div class="opts"><button type="button" class="opt" data-act="mref">refresh</button><button type="button" class="opt" data-act="app:ntfy">open ntfy</button></div>'+
       (L.length?L.map(x=>'<div class="mmsg'+(x.t>seen?' new':'')+'"><span class="cd">'+mStamp(x.t)+(x.t>seen?' <span class="cy">new</span>':'')+'</span><div class="cap">'+esc(x.m)+'</div></div>').join(''):'<div class="cd">no messages in the last 30 days</div>'); }
+  /* tailscale peers: probe each one (ping, then sunshine 47989, then ssh 22). list comes from config, pc name is the pc */
+  const peerList=()=>String(CFG.peers||CFG.pc||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>{ const i=s.indexOf('='); return i>0?{n:s.slice(0,i).trim(),h:s.slice(i+1).trim()}:{n:s,h:s}; });
+  let peerBusy=false;
+  function peers(){ if(!DEV||peerBusy) return; const L=peerList(); if(!L.length){ D.peers=[]; D.pc=null; soft(); return; } peerBusy=true;
+    const nc=h=>BB+' nc -z -w 2 '+q(h)+' ';
+    const cmd=L.map((p,i)=>'( ping -c 1 -W 2 '+q(p.h)+' >/dev/null 2>&1 || '+nc(p.h)+'47989 >/dev/null 2>&1 || '+nc(p.h)+'22 >/dev/null 2>&1 ) && echo UP'+i+' &').join(' ')+' wait';
+    sh(cmd).then(r=>{ peerBusy=false; D.peers=L.map((p,i)=>({n:p.n,h:p.h,up:new RegExp('UP'+i+'\\b').test(r.out)}));
+      const pc=D.peers.find(p=>p.n===CFG.pc)||D.peers[0]; D.pc=pc?pc.up:null; soft(); if(view()==='tail') render(); }); }
   let lastSig='';
-  function soft(){ services(); const sig=JSON.stringify([D.minco,D.bat,D.chg,D.vpn,D.ssid,D.wifi,D.sshd,D.chroot,D.wx,D.notion,S.tasks,S.vol,S.brt]);
+  function soft(){ services(); const sig=JSON.stringify([D.pc,D.peers.map(p=>p.up).join(),D.minco,D.bat,D.chg,D.vpn,D.ssid,D.wifi,D.sshd,D.chroot,D.wx,D.notion,S.tasks,S.vol,S.brt]);
     if(sig===lastSig) return; lastSig=sig;
     const a=document.activeElement; if(S.talking||S.noteMic||S.dd||S.picker||(a&&ui.contains(a)&&a.matches('input,textarea'))) return;
     if(!['home','hud'].includes(view())) return;
@@ -744,7 +752,7 @@ html.devm .screen{border-radius:0}
       return '<dl class="stat"><dt>wifi:</dt><dd>'+esc(S.wifi)+' <span class="cd">.</span> dex '+(CFG.dex==='api'?on(!!CFG.akey,'api','no key'):'<span class="cg">claude code</span>')+'</dd>'+mincoRow()+
         '<dt><button type="button" class="tl" data-act="tail">tailscale:</button></dt><dd>'+on(D.vpn,'connected','off')+' <button type="button" class="lk" data-act="app:tailscale">[open]</button></dd>'+
         '<dt>notion:</dt><dd>'+(!CFG.ntoken?'<span class="cd">not linked</span>':D.notion==='err'?'<span class="cy">error</span>':D.notion?'<span class="cg">synced</span> <span class="cd">'+D.ntime+'</span>':'<span class="cd">syncing</span>')+' <button type="button" class="lk" data-act="app:notion">[open]</button></dd>'+
-        '<dt>pc:</dt><dd><button type="button" class="lk" data-act="stream">[stream]</button> <span class="cd">'+esc(CFG.pc)+'</span></dd>'+
+        '<dt>pc:</dt><dd>'+(D.pc==null?'<span class="cd">checking</span> ':D.pc?'<button type="button" class="lk" data-act="stream">[stream]</button> ':'<span class="cy">offline</span> ')+'<span class="cd">'+esc(CFG.pc)+'</span></dd>'+
         '<dt>ubu:</dt><dd>'+(D.sshd==null?'<span class="cd">checking</span>':D.sshd?'<span class="cg">sshd :2222</span>':'<span class="cy">sshd down</span>')+(D.chroot?' <span class="cd">chroot</span>':'')+'</dd>'+
         '<dt>bat:</dt><dd>'+D.bat+'%'+(D.chg?' <span class="cg">charging</span>':'')+'</dd></dl>'; }
     return '<dl class="stat"><dt>wifi:</dt><dd>'+esc(S.wifi)+' <span class="cd">.</span> dex <span class="cg">online</span></dd>'+mincoRow()+'<dt><button type="button" class="tl" data-act="tail">tailscale:</button></dt><dd>'+PEERS.length+' peers <button type="button" class="lk" data-act="tail">[open]</button></dd>'+
@@ -783,10 +791,12 @@ html.devm .screen{border-radius:0}
     return '<div class="ddp" role="dialog" aria-label="Quick settings"><div class="ddh"><span>quick settings</span></div>'+bar('volume','vol')+bar('brightness','brt')+
       (DEV?'<div class="ddr"><span class="ddl">wifi</span><div class="nets"><button type="button" class="net on" data-act="wifiset"><span>* '+esc(S.wifi)+'</span><span class="s">'+(D.vpn?'vpn up':'settings')+'</span></button></div></div></div>':'')+(DEV?'':'<div class="ddr"><span class="ddl">wifi</span><div class="nets">'+S.nets.map(n=>'<button type="button" class="net'+(n[0]===S.wifi?' on':'')+'" data-act="net:'+esc(n[0])+'"><span>'+(n[0]===S.wifi?'* ':'  ')+esc(n[0])+'</span><span class="s">'+(n[0]===S.wifi?'connected':n[1])+'</span></button>').join('')+'</div></div></div>');
   }
-  const tailBody=()=>DEV?'<div class="cd">vpn: '+(D.vpn?'<span class="cg">connected</span>':'off')+'</div><div class="opts"><button type="button" class="opt" data-act="app:tailscale">open tailscale</button></div><div class="cd">peers and IPs live in the Tailscale app. ssh to this phone: root@fold -p 2222.</div>':'<div class="ptbl"><span class="h">device</span><span class="h">ip</span><span class="h">state</span>'+PEERS.map(p=>'<span>'+p[0]+'</span><span class="cd">'+p[1]+'</span><span class="'+(p[2]==='ok'?'cg':'cd')+'">'+p[2]+'</span>').join('')+'<span class="ch">fold (this)</span><span class="cd">100.64.0.5</span><span class="cg">ok</span></div><div class="cd">exit node: none . magicdns: on</div>';
+  const tailBody=()=>DEV?'<div class="cd">vpn: '+(D.vpn?'<span class="cg">connected</span>':'off')+'</div>'+
+    (D.peers.length?'<div class="ptbl"><span class="h">device</span><span class="h">address</span><span class="h">state</span>'+D.peers.map(p=>'<span class="'+(p.up?'ch':'cd')+'">'+esc(p.n)+'</span><span class="cd">'+(p.h===p.n?'':esc(p.h))+'</span><span class="'+(p.up?'cg':'cd')+'">'+(p.up?'online':'offline')+'</span>').join('')+'</div>':'<div class="cd">checking peers...</div>')+
+    '<div class="opts"><button type="button" class="opt" data-act="pref">refresh</button><button type="button" class="opt" data-act="app:tailscale">open tailscale</button></div><div class="cd">edit the list in config -> tailscale peers. ssh to this phone: root@galaxy-fold -p 2222.</div>':'<div class="ptbl"><span class="h">device</span><span class="h">ip</span><span class="h">state</span>'+PEERS.map(p=>'<span>'+p[0]+'</span><span class="cd">'+p[1]+'</span><span class="'+(p[2]==='ok'?'cg':'cd')+'">'+p[2]+'</span>').join('')+'<span class="ch">fold (this)</span><span class="cd">100.64.0.5</span><span class="cg">ok</span></div><div class="cd">exit node: none . magicdns: on</div>';
   function kbHTML(){
     const sym=S.kbSym, up=S.kbShift;
-    const L=sym?['1234567890','-/:;()$&@"','#=+_.,?!\'']:['qwertyuiop','asdfghjkl','zxcvbnm'];
+    const L=sym?(up?['[]{}#%^*+=','_\\|~<>`$€£','.,?!\'"']:['1234567890','-/:;()$&@"','#=+_.,?!\'']):['qwertyuiop','asdfghjkl','zxcvbnm'];
     const keys=r=>r.split('').map(c=>{const ch=up&&!sym?c.toUpperCase():c; return '<button type="button" data-k="'+esc(ch)+'">'+esc(ch)+'</button>';}).join('');
     return '<div class="kb" aria-label="Keyboard"><div class="kr fnr"><button type="button" class="fn" data-k="hide">esc</button><button type="button" class="fn" data-k="tab">tab</button><button type="button" class="fn" data-k="-">-</button><button type="button" class="fn" data-k="/">/</button><button type="button" class="fn" data-k="left">&lt;</button><button type="button" class="fn" data-k="right">&gt;</button><button type="button" class="fn hidek" data-k="hide">hide</button></div>'+
       '<div class="kr">'+keys(L[0])+'</div><div class="kr ind">'+keys(L[1])+'</div><div class="kr"><button type="button" class="fn'+(up?' on':'')+'" data-k="shift">'+(sym?'#+':'^')+'</button>'+keys(L[2])+'<button type="button" class="fn" data-k="bk">&lt;x</button></div>'+
@@ -805,7 +815,7 @@ html.devm .screen{border-radius:0}
     else if(k==='bk'){ if(a!==b) el.setRangeText('',a,b,'end'); else if(a>0) el.setRangeText('',a-1,a,'end'); }
     else el.setRangeText(k==='space'?' ':k==='tab'?'  ':k,a,b,'end');
     el.dispatchEvent(new Event('input',{bubbles:true}));
-    if(S.kbShift){ S.kbShift=false; ui.querySelector('.kb').outerHTML=kbHTML(); }
+    if(S.kbShift&&!S.kbSym){ S.kbShift=false; ui.querySelector('.kb').outerHTML=kbHTML(); }
   }
   function saverHTML(){ const t=S.tasks.find(x=>!x.d);
     return '<div class="saver" data-act="unsaver" aria-label="Screen saver, tap to close"><div class="sv js-sv">'+big('FOLD//DEX',true)+'<div class="bigclk js-t"></div><div><b class="js-d"></b> . '+wxs()+' . '+city()+'</div>'+
@@ -897,7 +907,7 @@ html.devm .screen{border-radius:0}
       <i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i>            <i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i><i style="color:#8431bc">██</i>
       <i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i>            <i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i><i style="color:#872eb8">██</i>
       <i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i>            <i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i><i style="color:#8a2bb5">██</i>`;
-  const streamBody=()=>'<button type="button" class="asc" data-act="stream" aria-label="Stream the PC" style="text-align:center">'+'<span class="art">'+PCART+'</span></button><div class="srow"><span>'+(DEV?esc(CFG.pc)+' . moonlight':'desktop-k5qkpsj . 1080p60 . 4ms')+'</span><button type="button" class="lk" data-act="stream">[connect]</button></div>';
+  const streamBody=()=>'<button type="button" class="asc" data-act="stream" aria-label="Stream the PC" style="text-align:center">'+'<span class="art">'+PCART+'</span></button><div class="srow"><span>'+(DEV?esc(CFG.pc)+' . moonlight':'desktop-k5qkpsj . 1080p60 . 4ms')+'</span>'+(DEV&&D.pc===false?'<span class="cy">offline</span>':DEV&&D.pc==null?'<span class="cd">checking</span>':'<button type="button" class="lk" data-act="stream">[connect]</button>')+'</div>';
   const win=(title,body,x)=>'<section class="win"><div class="wt"><span>'+title+'</span><span>'+(x||'')+'</span></div><div class="wb">'+body+'</div></section>';
 
   /* ---------- cover ---------- */
@@ -982,7 +992,7 @@ html.devm .screen{border-radius:0}
           (CFG.ndbs.length?CFG.ndbs.map((d,i)=>'<div class="dbrow"><button type="button" class="'+(d.on?'':'off')+'" data-act="ndb:'+i+'">'+(d.on?'[x] ':'[ ] ')+esc(d.name)+'</button><button type="button" class="dbc c-'+d.c+'" data-act="ndbc:'+i+'">■ colour</button></div>').join(''):'<div class="cd">none yet</div>')+
           '<div class="acts"><button type="button" class="lk" data-act="nfind">[find my databases]</button></div></div>'+
         '<div class="cfg"><span>dex<small>who answers</small></span><div class="acts"><button type="button" class="lk" data-act="dexeng">'+(CFG.dex==='api'?'[api key]':'[claude code . your subscription]')+'</button><button type="button" class="lk" data-act="ccinstall">[install claude code]</button><button type="button" class="lk" data-act="dexnew">[new dex chat]</button></div>'+
-          '<div class="cd">claude code: install once, then open termux, type ubuntu, run claude and sign in once.</div></div>'+f('nnotes','notion notes database id','optional, deck notes get copied here')+f('pc','pc name','label for moonlight')+f('city','weather city','label only')+f('lat','latitude','weather')+f('lon','longitude','weather')+
+          '<div class="cd">claude code: install once, then open termux, type ubuntu, run claude and sign in once.</div></div>'+f('nnotes','notion notes database id','optional, deck notes get copied here')+f('pc','pc name','tailscale name of the pc')+f('peers','tailscale peers','comma list: name or name=100.x.x.x')+f('city','weather city','label only')+f('lat','latitude','weather')+f('lon','longitude','weather')+
         [['scan','scanlines','CRT lines on both screens'],['dense','dense front screen','smaller text on the cover'],['wheel','click wheel on closed screen','swap the closed-screen d-pad for a scroll wheel'],['wheelI','click wheel on open screen','swap the open-screen d-pad for a scroll wheel']]
           .map(s=>'<button type="button" class="set'+(S.set[s[0]]?' on':'')+'" data-act="set:'+s[0]+'"><span class="tg">'+(S.set[s[0]]?'[on ]':'[off]')+'</span><span>'+s[1]+'<small>'+s[2]+'</small></span></button>').join('')+
         '<div class="cd">keys are stored only on this phone (webview storage). long-press a field to paste.</div></div></div></div>'; }
@@ -1245,6 +1255,7 @@ html.devm .screen{border-radius:0}
       case 'calendar': if(S.mode==='inner'){ S.selTask=-1; render(); launch('notion cal'); return; } break;
       case 'stream': launch('moonlight'); return;
       case 'mref': minco(); toast('checking...'); return;
+      case 'pref': peers(); toast('checking peers...'); return;
       case 'app': if(PK[v]){ launch(v); return; } if(v==='ubuntu'){ lineAct('term'); return; } break;
       case 'pkg': if(!Deck.launch(v)) toast('could not open '+v); return;
       case 'gscan': GAMES=null; render(); return;
@@ -1312,7 +1323,7 @@ html.devm .screen{border-radius:0}
       case 'pdir': S.ppath.push(v); render(); break;
       case 'pup': S.ppath.pop(); render(); break;
       case 'ppick': { const tok='[file: /'+S.ppath.join('/')+'/'+v+']'; const at=S.caret==null?S.draft.b.length:S.caret; S.draft.b=S.draft.b.slice(0,at)+tok+S.draft.b.slice(at); S.caret=at+tok.length; S.picker=false; render(); toast('inserted '+v); break; }
-      case 'tail': if(S.mode==='cover') S.cstack=['home','tail']; else S.istack.push('tail'); render(); break;
+      case 'tail': if(S.mode==='cover') S.cstack=['home','tail']; else S.istack.push('tail'); render(); if(DEV) peers(); break;
       case 'minco': S.mseen0=CFG.mseen||0; CFG.mseen=Math.floor(Date.now()/1000); store.set('cfg',CFG); if(DEV) D.minco=CFG.mtopic?0:null; if(S.mode==='cover') S.cstack=['home','minco']; else S.istack.push('minco'); render(); if(DEV) minco(); break;
       case 'saver': S.saver=true; render(); break;
       case 'unsaver': S.saver=false; render(); break;
@@ -1343,7 +1354,7 @@ html.devm .screen{border-radius:0}
   document.addEventListener('contextmenu',e=>{ if(!e.target.closest('.js-cfg')) e.preventDefault(); });
   document.addEventListener('selectstart',e=>{ if(!e.target.closest||!e.target.closest('input,textarea')) e.preventDefault(); });
   ui.addEventListener('focusin',e=>{ if(e.target.matches('input,textarea')&&!e.target.classList.contains('js-cfg')){ kbIn=e.target; ui.classList.add('kbon'); setTimeout(()=>reveal(e.target),60); } });
-  ui.addEventListener('focusout',e=>{ if(DEV&&e.target.classList&&e.target.classList.contains('js-cfg')){ tasks(); weather(); minco(); } setTimeout(()=>{ const a=document.activeElement; if(!(a&&ui.contains(a)&&a.matches('input,textarea'))) ui.classList.remove('kbon'); },0); });
+  ui.addEventListener('focusout',e=>{ if(DEV&&e.target.classList&&e.target.classList.contains('js-cfg')){ tasks(); weather(); minco(); peers(); } setTimeout(()=>{ const a=document.activeElement; if(!(a&&ui.contains(a)&&a.matches('input,textarea'))) ui.classList.remove('kbon'); },0); });
   ui.addEventListener('click',e=>{
     const kk=e.target.closest('[data-k]'); if(kk){ kk.classList.add('hit'); setTimeout(()=>kk.classList.remove('hit'),110); kbPress(kk.dataset.k); return; }
     const pb=e.target.closest('[data-pad]'); if(pb){ pb.classList.add('hit'); setTimeout(()=>pb.classList.remove('hit'),120); padPress(pb.dataset.pad); return; }
@@ -1429,9 +1440,9 @@ html.devm .screen{border-radius:0}
     window.addEventListener('resize',()=>{ const d=detect(); if(d.mode!==S.mode){ stopDictate(); S.orient=d.orient; toggleOpen(); refresh(); } else if(d.orient!==S.orient){ S.orient=d.orient; layout(); render(); } else layout(); sizeSky(); });
     window.deckBack=()=>{ const a=document.activeElement; if(S.saver){ S.saver=false; render(); return; } if(a&&ui.contains(a)&&a.matches('input,textarea')){ a.blur(); return; } if(wAdj){ wBack(); return; } padBack(); };
     window.deckHome=goHome;
-    let lastR=0; window.deckResume=()=>{ refresh(); minco(); if(['games'].includes(view())){ GAMES=null; render(); } if(Date.now()-lastR>120000){ lastR=Date.now(); tasks(); weather(); } };
-    setInterval(()=>{ if(!document.hidden){ refresh(); minco(); } },60000); setInterval(tasks,600000); setInterval(weather,1800000);
-    setTimeout(()=>{ refresh(); tasks(); weather(); minco(); lastR=Date.now(); },400);
+    let lastR=0; window.deckResume=()=>{ refresh(); minco(); peers(); if(['games'].includes(view())){ GAMES=null; render(); } if(Date.now()-lastR>120000){ lastR=Date.now(); tasks(); weather(); } };
+    setInterval(()=>{ if(!document.hidden){ refresh(); minco(); peers(); } },60000); setInterval(tasks,600000); setInterval(weather,1800000);
+    setTimeout(()=>{ refresh(); tasks(); weather(); minco(); peers(); lastR=Date.now(); },400);
   } else window.addEventListener('resize',layout);
   (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{layout();render();});
   layout(); render(); sizeSky();
