@@ -715,6 +715,7 @@ html.devm .screen{border-radius:0}
   function dictate(on){ if(!DEV){ return false; } clearTimeout(spDog); SP={base:'',last:'',on,active:true,miss:0,ready:false}; Deck.listen();
     spDog=setTimeout(()=>{ if(SP&&!SP.ready){ toast('mic did not start: speech service not answering'); try{ Deck.stopListen(); }catch(e){} spFinish('no start'); } },6000); return true; }
   function stopDictate(){ if(DEV) Deck.stopListen(); if(!SP) return; SP.active=false; clearTimeout(spDog); spDog=setTimeout(()=>spFinish(''),2500); }
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden&&SP&&SP.active) stopDictate(); });
   window.deckSpeechState=st=>{ if(!SP) return; if(st==='ready'&&!SP.ready){ SP.ready=true; if(SP.active) clearTimeout(spDog); } if(SP.onState) SP.onState(st); };
   window.deckSpeech=(t,fin,err)=>{ if(!SP) return;
     if(err){ const code=+((String(err).match(/error (\d+)/)||[])[1]||0);
@@ -800,7 +801,7 @@ html.devm .screen{border-radius:0}
     const sym=S.kbSym, up=S.kbShift;
     const L=sym?(up?['[]{}#%^*+=','_\\|~<>`$€£','.,?!\'"']:['1234567890','-/:;()$&@"','#=+_.,?!\'']):['qwertyuiop','asdfghjkl','zxcvbnm'];
     const keys=r=>r.split('').map(c=>{const ch=up&&!sym?c.toUpperCase():c; return '<button type="button" data-k="'+esc(ch)+'">'+esc(ch)+'</button>';}).join('');
-    return '<div class="kb" aria-label="Keyboard"><div class="kr fnr"><button type="button" class="fn" data-k="hide">esc</button><button type="button" class="fn" data-k="tab">tab</button><button type="button" class="fn" data-k="-">-</button><button type="button" class="fn" data-k="/">/</button><button type="button" class="fn" data-k="left">&lt;</button><button type="button" class="fn" data-k="right">&gt;</button><button type="button" class="fn hidek" data-k="hide">hide</button></div>'+
+    return '<div class="kb" aria-label="Keyboard"><div class="kr fnr"><button type="button" class="fn" data-k="hide">esc</button><button type="button" class="fn" data-k="tab">tab</button><button type="button" class="fn" data-k="-">-</button><button type="button" class="fn" data-k="/">/</button><button type="button" class="fn" data-k="|">|</button><button type="button" class="fn" data-k="left">&lt;</button><button type="button" class="fn" data-k="right">&gt;</button><button type="button" class="fn hidek" data-k="hide">hide</button></div>'+
       '<div class="kr">'+keys(L[0])+'</div><div class="kr ind">'+keys(L[1])+'</div><div class="kr"><button type="button" class="fn'+(up?' on':'')+'" data-k="shift">'+(sym?'#+':'^')+'</button>'+keys(L[2])+'<button type="button" class="fn" data-k="bk">&lt;x</button></div>'+
       '<div class="kr"><button type="button" class="fn" data-k="sym">'+(sym?'abc':'123')+'</button><button type="button" data-k=",">,</button><button type="button" class="spc" data-k="space">space</button><button type="button" data-k=".">.</button><button type="button" class="fn ret" data-k="enter">ret</button></div></div>';
   }
@@ -1164,15 +1165,20 @@ html.devm .screen{border-radius:0}
     }
     ui.querySelectorAll('.js-hold').forEach(hold=>{
       const caps=(hold.closest('.pane,.wb')||ui).querySelector('.js-ccaps'), big=!!hold.closest('.fMics');
-      if(DEV){ let el=null;
-        const lab=on=>hold.innerHTML=on==='wait'?(big?'<b>*</b><span>starting mic</span><small>keep holding</small>':'<b>*</b> starting mic...'):on?(big?'<b>*</b><span>listening</span><small>release to send</small>':'<b>*</b> listening, release to send'):(big?'<b>*</b><span>dex mic</span><small>hold to talk</small>':'<b>*</b> hold to talk');
+      if(DEV){ let el=null, latch=false, t0=0, lastUp=0;
+        const lab=on=>hold.innerHTML=on==='latch'?(big?'<b>*</b><span>listening</span><small>tap to stop</small>':'<b>*</b> listening, tap to stop'):on==='wait'?(big?'<b>*</b><span>starting mic</span><small>keep holding</small>':'<b>*</b> starting mic...'):on?(big?'<b>*</b><span>listening</span><small>release to send</small>':'<b>*</b> listening, release to send'):(big?'<b>*</b><span>dex mic</span><small>hold to talk</small>':'<b>*</b> hold to talk');
         const st=e=>{ if(e&&e.preventDefault) e.preventDefault(); if(S.talking) return; S.talking=true; hold.classList.add('on'); lab('wait'); try{ if(e&&e.pointerId!=null) hold.setPointerCapture(e.pointerId); }catch(_){}
           el=document.createElement('div'); el.className='cap live'; el.innerHTML='<b class="cd">you&gt; </b><span></span>'; caps.appendChild(el); caps.scrollTop=caps.scrollHeight;
-          dictate((txt,fin,err)=>{ if(el) el.lastChild.textContent=txt; if(!fin) return; S.talking=false; hold.classList.remove('on'); lab(false);
+          dictate((txt,fin,err)=>{ if(el) el.lastChild.textContent=txt; if(!fin) return; S.talking=false; latch=false; hold.classList.remove('on'); lab(false);
             if(txt&&el){ el.classList.remove('live'); S.chat.push({me:true,s:txt}); store.set('chat',S.chat.slice(-40)); dexAsk(caps); } else { if(el) el.remove(); if(!txt&&!err) toast('nothing heard'); } el=null; });
-          if(SP) SP.onState=s=>{ if(s==='ready'&&S.talking) lab(true); }; };
+          if(SP) SP.onState=s=>{ if(s==='ready'&&S.talking) lab(latch?'latch':true); }; };
         const en=()=>{ if(!S.talking) return; stopDictate(); hold.classList.remove('on'); lab(false); };
-        hold.addEventListener('pointerdown',st); hold.addEventListener('pointerup',en); hold.addEventListener('pointercancel',en);
+        /* touch events, not pointer events: android cancels a held pointer as a long-press. quick tap = latch on, tap again = stop; hold = push to talk */
+        const down=e=>{ if(e&&e.cancelable) e.preventDefault(); if(S.talking){ if(latch){ latch=false; en(); } return; } t0=Date.now(); latch=false; st(); };
+        const up=e=>{ if(e&&e.cancelable) e.preventDefault(); lastUp=Date.now(); if(!S.talking||latch) return; if(Date.now()-t0<350){ latch=true; lab('latch'); return; } en(); };
+        hold.addEventListener('touchstart',down,{passive:false}); hold.addEventListener('touchend',up,{passive:false}); hold.addEventListener('touchcancel',up,{passive:false});
+        hold.addEventListener('mousedown',e=>{ if(Date.now()-lastUp>600) down(e); }); hold.addEventListener('mouseup',e=>{ if(S.talking&&!latch&&Date.now()-lastUp>600) up(e); });
+        hold.addEventListener('click',e=>{ if(Date.now()-lastUp<600) return; if(S.talking){ latch=false; en(); } else { latch=true; st(); lab('latch'); } });
         return; }
       const start=e=>{ if(e&&e.preventDefault) e.preventDefault(); if(S.talking) return; S.talking=true; hold.classList.add('on'); hold.innerHTML=big?'<b>*</b><span>listening</span><small>release to send</small>':'<b>*</b> listening, release to send';
         const q='what is my next task?'; const el=document.createElement('div'); el.className='cap live'; el.innerHTML='<b class="cd">you&gt; </b><span></span>'; caps.appendChild(el); caps.scrollTop=caps.scrollHeight;
