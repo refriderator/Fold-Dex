@@ -1,0 +1,9 @@
+# signing key stays off GitHub (keep your copy safe, updates need it)
+*.jks
+*.keystore
+# builds
+*.apk
+build/
+# shell history can hold passwords
+.bash_history
+.DS_Store

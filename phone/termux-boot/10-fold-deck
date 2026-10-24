@@ -1,0 +1,4 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# ~/.termux/boot/10-fold-deck  (runs on boot via Termux:Boot)
+termux-wake-lock
+su -c /data/local/ubuntu-boot.sh
