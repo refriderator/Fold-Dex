@@ -1251,7 +1251,10 @@ html.devm .screen{border-radius:0}
       case 'gscan': GAMES=null; render(); return;
       case 'gplay': playGame(+v); return;
       case 'go': if(v==='@claudeweb') act('claudeweb'); else if(v==='@ubu'){ if(S.mode==='cover'){ S.cstack=['home','term']; render(); } else lineAct('term'); } else if(!Deck.launch(v)) toast('could not open '+v); return;
-      case 'claudeweb': Deck.view('https://claude.ai/new','com.sec.android.app.sbrowser')||Deck.view('https://claude.ai/new',''); return;
+      case 'claudeweb': { const SB='com.sec.android.app.sbrowser', now=Date.now(), dbl=now-(S.cwTap||0)<2500; S.cwTap=now;
+        if(Deck.has('com.anthropic.claude')&&Deck.launch('com.anthropic.claude')) return;
+        if(store.get('cwOpen',false)&&!dbl&&Deck.launch(SB)) return;
+        store.set('cwOpen',true); Deck.view('https://claude.ai/new',SB)||Deck.view('https://claude.ai/new',''); return; }
       case 'wifiset': S.dd=false; render(); Deck.settings('android.settings.WIFI_SETTINGS'); return;
       case 'sethome': Deck.settings('android.settings.HOME_SETTINGS'); return;
       case 'sysset': Deck.settings('android.settings.SETTINGS'); return;
