@@ -59,7 +59,7 @@ The `Minco:` line under wifi shows `no messages` or `x messages` for texts from 
 2. Action: Get Contents of URL, `POST https://ntfy.sh/<topic>`, body = Shortcut Input
 3. On the Fold: config → *minco ntfy topic* → put the same topic in
 
-It counts messages since you last tapped the line. Tapping it clears it (and opens the ntfy app if it's installed).
+Tap the line to read them. The deck saves its own copy for 30 days (ntfy.sh only keeps them about 12 hours), so opening the list just marks them read, nothing gets deleted.
 
 ## Credits
 

@@ -234,6 +234,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .bar:hover::before{background:var(--hi)}
 .caps{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:calc(var(--fs) * .2)}
 .cap{white-space:pre-wrap;word-break:break-word}
+.mmsg{border-left:2px solid var(--line,#2a2350);padding-left:.6em} .mmsg.new{border-left-color:var(--y)}
 .cap b{font-weight:400}
 .cap.live::after{content:"_";color:var(--b);animation:blink 1s steps(1) infinite}
 .mic{display:flex;align-items:center;justify-content:center;gap:.6em;padding:calc(var(--fs) * .45);border:1px solid var(--line);border-radius:99px;color:var(--hi);user-select:none;touch-action:none;white-space:nowrap}
@@ -600,12 +601,25 @@ html.devm .screen{border-radius:0}
       {n:'notion.sync',st:CFG.ntoken?(D.notion==='err'?'wait':'ok'):'wait',nx:CFG.ntoken?(D.notion==='err'?'error':D.ntime||'...'):'unlinked',d:CFG.ntoken?dbsOn().length+' database'+(dbsOn().length===1?'':'s')+' on . notes db '+(CFG.nnotes?'set':'off')+(D.nerr?' . '+esc(D.nerr):''):'add a notion token in config'}];
   }
   /* minco: iphone shortcut posts each minco text to an ntfy topic, deck counts the ones since you last tapped */
+  let MS=store.get('minco',[]);
+  const MKEEP=30*86400, mUnread=()=>MS.filter(m=>m.t>(CFG.mseen||0)).length;
   function minco(){ if(!DEV||!CFG.mtopic) return; const base=/^https?:\/\//.test(CFG.mtopic)?CFG.mtopic.replace(/\/+$/,''):'https://ntfy.sh/'+encodeURIComponent(CFG.mtopic);
-    http('GET',base+'/json?poll=1&since='+(CFG.mseen||'12h')).then(r=>{ if(r.st!==200){ D.minco='err'; soft(); return; }
-      D.minco=String(r.body||'').split('\n').filter(l=>{ try{ return JSON.parse(l).event==='message'; }catch(e){ return false; } }).length; soft(); }); }
-  const mincoTxt=()=>{ const n=DEV?D.minco:2; if(DEV&&!CFG.mtopic) return '<span class="cd">no topic</span>'; if(n==null) return '<span class="cd">checking</span>'; if(n==='err') return '<span class="cy">error</span>';
+    const last=MS.length?MS[0].t:0;
+    return http('GET',base+'/json?poll=1&since='+(last?last:'all')).then(r=>{ if(r.st!==200){ D.minco='err'; soft(); return; }
+      const have=new Set(MS.map(m=>m.id)); let got=0;
+      String(r.body||'').split('\n').forEach(l=>{ let j; try{ j=JSON.parse(l); }catch(e){ return; } if(j.event!=='message'||have.has(j.id)) return; have.add(j.id); got++; MS.push({id:j.id,t:j.time,m:String(j.message||''),ti:String(j.title||'')}); });
+      const cut=Date.now()/1000-MKEEP; MS=MS.filter(m=>m.t>cut).sort((a,b)=>b.t-a.t); if(got) store.set('minco',MS);
+      D.minco=mUnread(); soft(); if(got&&view()==='minco') render(); }); }
+  const mincoTxt=()=>{ const n=DEV?D.minco:1; if(DEV&&!CFG.mtopic) return '<span class="cd">no topic</span>'; if(n==null) return '<span class="cd">checking</span>'; if(n==='err') return '<span class="cy">error</span>';
     return n?'<span class="cy">'+n+' message'+(n===1?'':'s')+'</span>':'<span class="cd">no messages</span>'; };
-  const mincoRow=()=>'<dt>Minco:</dt><dd><button type="button" class="tl" data-act="minco" aria-label="Minco messages, tap to mark read">'+mincoTxt()+'</button></dd>';
+  const mincoRow=()=>'<dt>Minco:</dt><dd><button type="button" class="tl" data-act="minco" aria-label="Minco messages, tap to read">'+mincoTxt()+'</button></dd>';
+  const MOCKM=[{id:'a',t:Date.now()/1000-300,m:'are you coming tonight?'},{id:'b',t:Date.now()/1000-5400,m:'lol ok'},{id:'c',t:Date.now()/1000-90000,m:'did you eat yet'}];
+  const mStamp=t=>{ const d=new Date(t*1000), now=new Date(), hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    return d.toDateString()===now.toDateString()?hm:d.toLocaleDateString('en-CA',{weekday:'short',day:'numeric',month:'short'}).toLowerCase().replace(/,/g,'')+' '+hm; };
+  function mincoBody(){ const L=DEV?MS:MOCKM, seen=DEV?(S.mseen0||0):Date.now()/1000-600;
+    if(DEV&&!CFG.mtopic) return '<div class="cd">no topic yet. set minco ntfy topic in config.</div>';
+    return '<div class="opts"><button type="button" class="opt" data-act="mref">refresh</button><button type="button" class="opt" data-act="app:ntfy">open ntfy</button></div>'+
+      (L.length?L.map(x=>'<div class="mmsg'+(x.t>seen?' new':'')+'"><span class="cd">'+mStamp(x.t)+(x.t>seen?' <span class="cy">new</span>':'')+'</span><div class="cap">'+esc(x.m)+'</div></div>').join(''):'<div class="cd">no messages in the last 30 days</div>'); }
   let lastSig='';
   function soft(){ services(); const sig=JSON.stringify([D.minco,D.bat,D.chg,D.vpn,D.ssid,D.wifi,D.sshd,D.chroot,D.wx,D.notion,S.tasks,S.vol,S.brt]);
     if(sig===lastSig) return; lastSig=sig;
@@ -897,6 +911,7 @@ html.devm .screen{border-radius:0}
     else if(v==='noteread'){ const n=S.notes[S.readNote]; mid=win('notes / '+esc(n.ti),'<button type="button" class="lk" data-act="openphone">open to edit [unfold]</button><div class="ch">'+esc(n.ti)+'</div><div class="cap">'+esc(n.b)+'</div><div class="cd">edited '+n.at+'</div>','<button type="button" class="lk" data-act="back">[back]</button>'); }
     else if(v==='split') mid=win('split screen','<div class="opts"><button type="button" class="opt" data-act="openphone">open split screen</button></div><div class="cd">unfolds into two tabs. pick any app for each side.</div>','<button type="button" class="lk" data-act="home">[x]</button>');
     else if(v==='tail') mid=win('tailscale',tailBody(),'<button type="button" class="lk" data-act="home">[x]</button>');
+    else if(v==='minco') mid=win('Minco',mincoBody(),'<button type="button" class="lk" data-act="home">[x]</button>');
     else if(v==='games') mid=win('games',gamesList(),'<button type="button" class="lk" data-act="gscan">[rescan]</button> <button type="button" class="lk" data-act="home">[x]</button>');
     else if(v==='apps') mid=win('apps','<div class="agrid">'+appTiles()+'</div>','<button type="button" class="lk" data-act="aedit">'+(AE?'[done]':'[edit]')+'</button> <button type="button" class="lk" data-act="home">[x]</button>');
     else if(v==='audio') mid=win('<span class="recl">* rec</span> <span class="js-at">0:00.0</span>','<pre class="vmeter js-vm" aria-hidden="true"></pre><div class="cap live js-acap"></div><div class="tchoice" style="padding:0"><button type="button" class="lk" data-act="asave">[save]</button><button type="button" class="lk" data-act="home">[discard]</button></div>','-&gt; deck://notes');
@@ -973,6 +988,7 @@ html.devm .screen{border-radius:0}
         [['ubuntu','chroot 24.04',1],['tailscale','tailnet',1],['termux','shell host',1],['moonlight','stream client',1],['split screen','any two apps',1],['games','empty for now',0],['notion','tasks',0],['notion cal','schedule',0],['magisk','root',0],['termux:x11','desktop',0],['termux:boot','auto-start',0],['browser','web',0]]
           .map(a=>'<button type="button" class="app'+(a[2]?' core':'')+'" data-act="app:'+a[0]+'"><b>'+a[0]+'</b><span>'+a[1]+'</span></button>').join('')+'</div></div></div></div>';
     else if(v==='tail') body='<div class="body one">'+tb('TAILSCALE')+'<div class="mn">'+win('tailnet',tailBody())+'</div></div>';
+    else if(v==='minco') body='<div class="body one">'+tb('MINCO')+'<div class="mn">'+win('messages',mincoBody())+'</div></div>';
     else if(v==='games') body='<div class="body one">'+tb('GAMES')+'<div class="mn">'+win('games',gamesBody())+'</div></div>';
     else if(v==='settings') body='<div class="body one">'+tb('CONFIG')+'<div class="mn"><div class="main">'+
         [['scan','scanlines','CRT lines on both screens'],['boot','start ubuntu on boot','Termux:Boot runs the chroot'],['sshd','ssh server :2222','reachable over Tailscale'],['dense','dense front screen','smaller text on the cover'],['wheel','click wheel on closed screen','swap the closed-screen d-pad for a scroll wheel'],['wheelI','click wheel on open screen','swap the open-screen d-pad for a scroll wheel']]
@@ -1225,7 +1241,7 @@ html.devm .screen{border-radius:0}
       case 'notionapp': S.selTask=-1; render(); launch('notion'); return;
       case 'calendar': if(S.mode==='inner'){ S.selTask=-1; render(); launch('notion cal'); return; } break;
       case 'stream': launch('moonlight'); return;
-      case 'minco': CFG.mseen=Math.floor(Date.now()/1000); store.set('cfg',CFG); D.minco=CFG.mtopic?0:null; render(); if(Deck.has&&Deck.has(PK.ntfy)) launch('ntfy'); return;
+      case 'mref': minco(); toast('checking...'); return;
       case 'app': if(PK[v]){ launch(v); return; } if(v==='ubuntu'){ lineAct('term'); return; } break;
       case 'pkg': if(!Deck.launch(v)) toast('could not open '+v); return;
       case 'gscan': GAMES=null; render(); return;
@@ -1291,6 +1307,7 @@ html.devm .screen{border-radius:0}
       case 'pup': S.ppath.pop(); render(); break;
       case 'ppick': { const tok='[file: /'+S.ppath.join('/')+'/'+v+']'; const at=S.caret==null?S.draft.b.length:S.caret; S.draft.b=S.draft.b.slice(0,at)+tok+S.draft.b.slice(at); S.caret=at+tok.length; S.picker=false; render(); toast('inserted '+v); break; }
       case 'tail': if(S.mode==='cover') S.cstack=['home','tail']; else S.istack.push('tail'); render(); break;
+      case 'minco': S.mseen0=CFG.mseen||0; CFG.mseen=Math.floor(Date.now()/1000); store.set('cfg',CFG); if(DEV) D.minco=CFG.mtopic?0:null; if(S.mode==='cover') S.cstack=['home','minco']; else S.istack.push('minco'); render(); if(DEV) minco(); break;
       case 'saver': S.saver=true; render(); break;
       case 'unsaver': S.saver=false; render(); break;
       case 'dexc': S.cstack=cv()==='voice'?['home']:['home','voice']; S.noteMode=false; render(); break;
