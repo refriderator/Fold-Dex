@@ -587,6 +587,8 @@ html.devm .screen{border-radius:0}
   const sh=cmd=>new Promise(r=>{ if(!DEV) return r({out:'',code:-1}); const id='s'+(++shN)+'_'+Date.now(); shCb[id]=r; Deck.sh(id,cmd); });
   const http=(m,url,h,b)=>new Promise(r=>{ const id='h'+(++hN); hCb[id]=r; Deck.http(id,m,url,JSON.stringify(h||{}),b?JSON.stringify(b):''); });
   const UBU='/data/local/ubuntu', BB='/data/adb/magisk/busybox';
+  /* make sure the chroot's /proc /sys /dev are mounted in THIS su session (magisk can give the app its own mount namespace) */
+  const MNT='mt(){ t=$1; shift; grep -q " $t " /proc/mounts || '+BB+' mount "$@" "$t"; }; mt '+UBU+'/proc -t proc proc; mt '+UBU+'/sys -t sysfs sys; mt '+UBU+'/dev -o bind /dev; mt '+UBU+'/dev/pts -o bind /dev/pts; ';
   const chroot=c=>BB+' chroot '+UBU+' /usr/bin/env -i HOME=/root TERM=dumb LANG=C.UTF-8 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash -c '+q(c);
   const PK={tailscale:'com.tailscale.ipn',termux:'com.termux',moonlight:'com.limelight',notion:'notion.id','notion cal':'com.cron.calendar',
     magisk:'com.topjohnwu.magisk',ntfy:'io.heckel.ntfy','termux:boot':'com.termux.boot',spotify:'com.spotify.music',browser:'com.sec.android.app.sbrowser',aurora:'com.aurora.store',settings:'com.android.settings'};
@@ -690,13 +692,13 @@ html.devm .screen{border-radius:0}
         'Answer in short plain text for a tiny terminal screen: no markdown, no bullet symbols, at most a few lines unless asked. Now: '+new Date().toString()+'. '+
         'Today\'s Notion tasks: '+(S.tasks.map(t=>(t.d?'[x] ':'[ ] ')+t.at+' '+t.t).join('; ')||'none loaded')+'. Recent notes: '+(S.notes.slice(0,5).map(n=>n.ti).join('; ')||'none')+'.';
     if(CFG.dex!=='api'){ const last=[...S.chat].reverse().find(m=>m.me); const cont=store.get('dexcont',false);
-      const mk=c=>'export PATH=/root/.local/bin:$PATH; mkdir -p /root/dex && cd /root/dex && claude -p '+(c?'--continue ':'')+'--append-system-prompt '+q(sys0)+' '+q(last?last.s:'hi')+' 2>&1';
-      let r=await sh(chroot(mk(cont))); if(cont&&/no conversation found/i.test(r.out)) r=await sh(chroot(mk(false)));
+      const mk=c=>'export PATH=/root/.local/bin:$PATH DISABLE_AUTOUPDATER=1; mkdir -p /root/dex && cd /root/dex && claude -p '+(c?'--continue ':'')+'--append-system-prompt '+q(sys0)+' '+q(last?last.s:'hi')+' 2>&1';
+      let r=await sh(MNT+chroot(mk(cont))); if(cont&&/no conversation found/i.test(r.out)) r=await sh(MNT+chroot(mk(false)));
       const o=r.out.trim();
       if(r.code===0&&o){ ans=o; store.set('dexcont',true); }
-      else if(/claude: command not found|No such file or directory/i.test(o)) ans='claude code is not installed yet. config -> [install claude code].';
-      else if(/log ?in|auth|credential|api key|token/i.test(o)) ans='claude code is not signed in. open termux, type ubuntu, run claude, sign in once. ('+o.split('\n').pop().slice(0,80)+')';
-      else ans='claude code error: '+(o.split('\n').slice(-2).join(' ').slice(0,160)||'exit '+r.code); }
+      else if(/claude: (command )?not found/i.test(o)) ans='claude code is not installed yet. config -> [install claude code].';
+      else if(/not logged in|please run \/login|invalid api key|authentication/i.test(o)) ans='claude code is not signed in. open termux, type ubuntu, run claude, sign in once. ('+o.split('\n').pop().slice(0,80)+')';
+      else ans='claude code error (exit '+r.code+'): '+(o.split('\n').slice(-4).join(' ').slice(0,300)||'no output'); }
     else if(!CFG.akey) ans='no api key yet. config -> anthropic key, or switch dex to claude code.';
     else { const msgs=[]; S.chat.slice(-24).forEach(m=>{ const role=m.me?'user':'assistant'; if(!msgs.length&&role!=='user') return; const l=msgs[msgs.length-1]; if(l&&l.role===role) l.content+='\n'+m.s; else msgs.push({role,content:m.s}); });
       const sysOld='You are dex, the assistant built into the Fold Deck launcher on a Samsung Galaxy Fold (rooted, Ubuntu 24.04 chroot, Tailscale, Moonlight to the PC '+CFG.pc+'). '+
@@ -1277,7 +1279,7 @@ html.devm .screen{border-radius:0}
       case 'dexeng': CFG.dex=CFG.dex==='api'?'code':'api'; store.set('cfg',CFG); render(); return;
       case 'dexnew': S.chat=[{me:false,s:'new chat.'}]; store.set('chat',S.chat); store.set('dexcont',false); render(); return;
       case 'ccinstall': toast('installing claude code, takes a few minutes');
-        sh(chroot('export DEBIAN_FRONTEND=noninteractive; command -v curl >/dev/null || (apt-get update -qq && apt-get install -y -qq curl ca-certificates); curl -fsSL https://claude.ai/install.sh | bash 2>&1 | tail -4'))
+        sh(MNT+chroot('export DEBIAN_FRONTEND=noninteractive; command -v npm >/dev/null || (apt-get update -qq && apt-get install -y -qq nodejs npm); npm install -g @anthropic-ai/claude-code@2.1.112 2>&1 | tail -4'))
           .then(r=>toast(r.code===0?'claude code installed. sign in once from termux (ubuntu, then claude)':'install failed: '+(r.out.trim().split('\n').pop()||r.code))); return;
       case 'svcstart': toast('starting ubuntu + sshd'); sh('sh /data/local/ubuntu-boot.sh').then(r=>{ toast(r.out.trim()?r.out.trim().split('\n').pop():'started'); refresh(); }); return;
       case 'toggletask': ntoggle(+v); return;
